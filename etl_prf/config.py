@@ -13,3 +13,5 @@ IDS_README: dict[int, str] = {
     2018: "1J-012nSnIafOASNFvIYY_vDKKpM51w5_",
     2017: "1Kv5mNgZvxtl0xwqsmDrxcaLY2KELxR-3",
 }
+
+URL_DOWNLOAD = "https://drive.google.com/uc?export=download&id={id}"

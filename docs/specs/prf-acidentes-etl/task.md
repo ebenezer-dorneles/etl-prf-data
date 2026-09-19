@@ -23,12 +23,18 @@
 - [x] Phase 4 — Refactor: `parse_pagina(html)` pura, separada de `descobrir(session)`
 - [x] Phase 4 — Done when: testes verdes; `python3 -c` manual contra a página real devolve 10 pares (1 requisição, fora da suíte)
 
+- [x] Phase 5 — Red: `tests/test_drive.py` com `FakeSession` em stream (AC-17, AC-25, AC-26, AC-38, AC-40; erro HTTP e de rede)
+- [x] Phase 5 — Green: `etl_prf/drive.py` (`download_validated`, `Validacao`) + `URL_DOWNLOAD` em `config.py`
+- [x] Phase 5 — Refactor: `Validacao` (dataclass) carrega cabeçalhos e avisos; `_gravar` e `_validar` separados
+- [x] Phase 5 — Done when: testes verdes; nenhum `.part` sobra após falha (testado em cada falha)
+- [ ] Phase 5 — AC-11/AC-12 (contagem de GETs) ficam em `test_pipeline.py` na Phase 7, conforme a Coverage do plan
+
 ## State Handover
 
-- Done: Phase 4 completa e verificada (72 testes `not real` verdes; `test_crawler.py` 13 passed; página real devolveu 10 pares iguais ao README). Fases 1–3 seguem verdes.
-- Next: Phase 5 (download validado, `drive.py`) — rodar `/ssd-workflow:ssd-task` de novo; decompor só a Phase 5.
+- Done: Phase 5 completa e verificada (87 testes `not real` verdes; `test_drive.py` 15 passed). Fases 1–4 seguem verdes.
+- Next: Phase 6 (ano mais recente: `probe_headers`, `decidir_acao`, fechamento, `--force`) — rodar `/ssd-workflow:ssd-task` de novo; decompor só a Phase 6.
 - Blockers / open decisions: nenhum; sem CR aberto.
-- Watch out: (1) `crawler.descobrir(session) -> Descoberta(ids, fallback_usado, anos_fallback, divergencias, avisos)`; o pipeline deve levar `fallback_usado`/`anos_fallback`/`avisos` ao resumo (AC-10, AC-27) e o ano mais recente é `max(ids)` (D-22). (2) `config.py` tem `URL_PAGINA` e `IDS_README`. (3) O filtro exige "Todas as causas e tipos" na linha: a página tem também "por ocorrência" e "por pessoa" simples para os mesmos anos. (4) `FakeSession`/`Resp` estão em `tests/test_crawler.py`; mover para `conftest.py` na Phase 5 se `drive` precisar de sessão fake. (5) Herdados: API de `db.py` da Phase 3, RSS 717 MB em 2017 (medir 2024 na Phase 8), usar `-m "not real"` no ciclo.
+- Watch out: (1) `drive.download_validated(session, id_, destino, ano, force=False) -> Validacao(content_length, x_goog_hash, last_modified, avisos)`; levanta `EtlError`; a sessão precisa de `get(url, stream=True, timeout=)` com `.headers`, `.iter_content`, `.close`. Os `Validacao` alimentam as colunas `drive_*` de `etl_log` e o aviso do resumo (AC-40). (2) Ordem das validações: tamanho → é ZIP → crc32c (HTML de confirmação dá "resposta não é ZIP", não "sem crc32c"). (3) `probe_headers` (Phase 6) deve reaproveitar a leitura de cabeçalhos e `parse_goog_hash`; AC-41 usa a mesma mensagem "x-goog-hash sem crc32c". (4) `FakeSession`/`Resp` de streaming estão em `tests/test_drive.py`, os do crawler em `tests/test_crawler.py`; consolidar em `conftest.py` se a Phase 6/7 precisar de ambos. (5) Herdados: API de `db.py`/`crawler.descobrir` (Phase 3/4), RSS 717 MB em 2017 (medir 2024 na Phase 8), usar `-m "not real"` no ciclo.
 
 ## Deviations
 
@@ -42,6 +48,11 @@
 
 - 2026-09-19 — O filtro do crawler exige "Agrupados por pessoa - Todas as causas e tipos de acidentes" na linha, não só `Documento CSV de Acidentes <ano>`: a página real tem 3 linhas por ano (por ocorrência, por pessoa, por pessoa todas as causas) e só a última bate com os IDs do README/AC-9 · class: local · action: continuado; FR-5 já cita o texto completo entre parênteses
 - 2026-09-19 — `config.py` criado antes do Red (só dados, sem comportamento); Red confirmado pela falta de `etl_prf.crawler` · class: local · action: continuado
+
+- 2026-09-19 — Validações em ordem tamanho → ZIP → crc32c (a spec lista tamanho, crc32c, ZIP): assim uma página HTML do Drive, que não traz `x-goog-hash`, falha como "resposta não é ZIP" (AC-17) e não como "sem crc32c" · class: local · action: continuado; nenhum AC depende da ordem
+- 2026-09-19 — `content-length` ausente na resposta falha com "content-length ausente" e falha de rede/HTTP vira `EtlError("download falhou: …")`; a spec não descreve esses casos · class: local · action: continuado
+- 2026-09-19 — `drive.py` importa `_atualizar` (privado) de `crc32c.py` para calcular o crc32c em stream durante a gravação, sem reler o arquivo · class: local · action: continuado
+- 2026-09-19 — AC-11/AC-12 não são testados aqui: o plan os põe em `test_pipeline.py` (Phase 7), pois dependem do pipeline decidir baixar ou não · class: local · action: continuado; item aberto no Checklist
 
 ## Execution Log
 
@@ -74,6 +85,13 @@
 - Red: `tests/test_crawler.py` + `tests/fixtures/pagina_prf.html` (sintética: 3 linhas por ano 2007–2026 e 30 links de ruído); coleta falhou com `ModuleNotFoundError: etl_prf.crawler`.
 - Green: `config.py`, `crawler.py` (`parse_pagina`, `mesclar`, `descobrir`); 13 testes passaram de primeira.
 - Página real (1 GET): 10 pares iguais ao README, sem fallback nem divergência.
+- Desvios locais registrados acima.
+
+### 2026-09-19 — Phase 5: download validado
+
+- Gate conferido: plan #1 na rev 6, aprovação da rev 6, sem CR aberto; `phase: implementing` já gravada.
+- Red: `tests/test_drive.py` (15 testes) escrito antes do código; coleta falhou com `ModuleNotFoundError: etl_prf.drive`.
+- Green: `drive.py` e `URL_DOWNLOAD`; 15 testes passaram de primeira.
 - Desvios locais registrados acima.
 
 ## Verification
@@ -114,6 +132,14 @@
 - [x] Static analysis scoped to changed files — `python3 -m compileall -q etl_prf tests` — `0 errors (baseline: n/a)`
 - [x] Lint / formatting — não há ferramenta no projeto (plan, Deferred) — n/a
 - [x] Any artifact the change is expected to (re)produce — `python3 -c "…descobrir(requests.Session())…"` contra a página real (1 requisição): `10 True False [] [] []` (10 pares, iguais ao README, sem fallback, sem divergências, sem avisos)
+
+### Pass — Phase 5 — 2026-09-19
+
+- [x] Red confirmed — `python3 -m pytest -q tests/test_drive.py` — `1 error de coleta: ModuleNotFoundError etl_prf.drive (15 testes ainda não coletados)`
+- [x] Full test suite — `python3 -m pytest -q -m "not real"` — `87 passed, 11 deselected, 0 failures` (`tests/test_drive.py`: 15 passed); `-m real` não reexecutado (Phase 5 não toca transform/zipcsv/db)
+- [x] Static analysis scoped to changed files — `python3 -m compileall -q etl_prf tests` — `0 errors (baseline: n/a)`
+- [x] Lint / formatting — não há ferramenta no projeto (plan, Deferred) — n/a
+- [x] Any artifact the change is expected to (re)produce — nenhum; `ls *.part` na raiz: nenhum arquivo sobrando
 
 ## Wrap up
 
