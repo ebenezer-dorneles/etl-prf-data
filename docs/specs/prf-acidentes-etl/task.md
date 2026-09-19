@@ -18,12 +18,17 @@
 - [x] Phase 3 — Refactor: DDL e SQL em constantes nomeadas (`DDL_ETL_LOG`, `SQL_*`)
 - [x] Phase 3 — Done when: testes passam e `sqlite3` de banco temporário mostra `ok` + `pulado` esperados (2017 real)
 
+- [x] Phase 4 — Red: `tests/test_crawler.py` + `tests/fixtures/pagina_prf.html` sintética (AC-9, AC-10, AC-27, AC-28, AC-29)
+- [x] Phase 4 — Green: `etl_prf/config.py` (10 IDs do README) e `etl_prf/crawler.py` (`parse_pagina`, `mesclar`, `descobrir`)
+- [x] Phase 4 — Refactor: `parse_pagina(html)` pura, separada de `descobrir(session)`
+- [x] Phase 4 — Done when: testes verdes; `python3 -c` manual contra a página real devolve 10 pares (1 requisição, fora da suíte)
+
 ## State Handover
 
-- Done: Phase 3 completa e verificada (59 testes `not real` verdes; `test_db.py` 12 passed). Fases 1–2 seguem verdes.
-- Next: Phase 4 (crawler e mesclagem com o README) — rodar `/ssd-workflow:ssd-task` de novo; decompor só a Phase 4.
+- Done: Phase 4 completa e verificada (72 testes `not real` verdes; `test_crawler.py` 13 passed; página real devolveu 10 pares iguais ao README). Fases 1–3 seguem verdes.
+- Next: Phase 5 (download validado, `drive.py`) — rodar `/ssd-workflow:ssd-task` de novo; decompor só a Phase 5.
 - Blockers / open decisions: nenhum; sem CR aberto.
-- Watch out: (1) API de `db.py` para o pipeline: `carregar_ano(conn, ano, zip, origem, drive=dict(content_length, x_goog_hash, last_modified))` só faz commit no sucesso e repassa a exceção — quem chama deve chamar `registrar_erro` (com `drive` se leu cabeçalhos). `registrar_pulado(conn, ano, origem, fechado=False)` exige referência e repete `fechado` (D-27); `fechado=True` grava a marca da verificação final (Phase 6). `ano_inalterado(conn, ano, impressao(zip))` decide pulo. (2) A conexão usa `isolation_level=None` (BEGIN explícito); `registrar_*` são autocommit. (3) Memória: carga real de 2017 em `carregar_ano` teve pico de RSS 717 MB (NFR-1: 1 GiB); anos maiores (2024: 603 mil linhas) ainda não medidos com o banco — medir na Phase 8 e reduzir `CHUNKSIZE` se preciso. (4) Suíte completa com `real` ~147 s; usar `-m "not real"` (~5 s) no ciclo Red/Green.
+- Watch out: (1) `crawler.descobrir(session) -> Descoberta(ids, fallback_usado, anos_fallback, divergencias, avisos)`; o pipeline deve levar `fallback_usado`/`anos_fallback`/`avisos` ao resumo (AC-10, AC-27) e o ano mais recente é `max(ids)` (D-22). (2) `config.py` tem `URL_PAGINA` e `IDS_README`. (3) O filtro exige "Todas as causas e tipos" na linha: a página tem também "por ocorrência" e "por pessoa" simples para os mesmos anos. (4) `FakeSession`/`Resp` estão em `tests/test_crawler.py`; mover para `conftest.py` na Phase 5 se `drive` precisar de sessão fake. (5) Herdados: API de `db.py` da Phase 3, RSS 717 MB em 2017 (medir 2024 na Phase 8), usar `-m "not real"` no ciclo.
 
 ## Deviations
 
@@ -34,6 +39,9 @@
 - 2026-09-19 — `test_real_counts.py` também roda `transformar` sobre cada chunk real (o plan pedia só a contagem de linhas); 2026 pula se a contagem mudar desde o E-1 · class: local · action: continuado
 
 - 2026-09-19 — Colunas de `etl_log` nomeadas por este passo (`drive_content_length`, `drive_x_goog_hash`, `drive_last_modified`, `tamanho`, `sha256`, `linhas`, `fechado`, `mensagem`, `timestamp`) e `db.py` ganhou `impressao`, `ano_inalterado`, `registrar_pulado`, `registrar_erro` além das funções do plan; a linha `ok` é gravada na mesma transação da carga · class: local · action: continuado
+
+- 2026-09-19 — O filtro do crawler exige "Agrupados por pessoa - Todas as causas e tipos de acidentes" na linha, não só `Documento CSV de Acidentes <ano>`: a página real tem 3 linhas por ano (por ocorrência, por pessoa, por pessoa todas as causas) e só a última bate com os IDs do README/AC-9 · class: local · action: continuado; FR-5 já cita o texto completo entre parênteses
+- 2026-09-19 — `config.py` criado antes do Red (só dados, sem comportamento); Red confirmado pela falta de `etl_prf.crawler` · class: local · action: continuado
 
 ## Execution Log
 
@@ -58,6 +66,14 @@
 - Red: `tests/test_db.py` escrito antes do código; coleta falhou com `ModuleNotFoundError: etl_prf.db`.
 - Green: `db.py` e `DDL_ETL_LOG` em `schema.py`; 12 testes novos passaram de primeira.
 - Carga real de 2017 em banco temporário: 342 497 linhas, `etl_log` com `ok` e `pulado` (tamanho 10 726 416, mesmo sha256), RSS 717 336 kB.
+- Desvios locais registrados acima.
+
+### 2026-09-19 — Phase 4: crawler e mesclagem com o README
+
+- Gate conferido: plan #1 na rev 6, aprovação da rev 6, sem CR aberto; `phase: implementing` já gravada.
+- Red: `tests/test_crawler.py` + `tests/fixtures/pagina_prf.html` (sintética: 3 linhas por ano 2007–2026 e 30 links de ruído); coleta falhou com `ModuleNotFoundError: etl_prf.crawler`.
+- Green: `config.py`, `crawler.py` (`parse_pagina`, `mesclar`, `descobrir`); 13 testes passaram de primeira.
+- Página real (1 GET): 10 pares iguais ao README, sem fallback nem divergência.
 - Desvios locais registrados acima.
 
 ## Verification
@@ -90,6 +106,14 @@
 - [x] Static analysis scoped to changed files — `python3 -m compileall -q etl_prf tests` — `0 errors (baseline: n/a)`
 - [x] Lint / formatting — não há ferramenta no projeto (plan, Deferred) — n/a
 - [x] Any artifact the change is expected to (re)produce — `sqlite3` em banco temporário após carga real de 2017 + `pulado`: `etl_log` = (2017, local, ok, 342497, 10726416, 2577824c, 0) e (2017, local, pulado, NULL, 10726416, 2577824c, 0); `COUNT(*) acidentes` = 342497; pico RSS 717 336 kB
+
+### Pass — Phase 4 — 2026-09-19
+
+- [x] Red confirmed — `python3 -m pytest -q tests/test_crawler.py` — `1 error de coleta: ModuleNotFoundError etl_prf.crawler (13 testes ainda não coletados)`
+- [x] Full test suite — `python3 -m pytest -q -m "not real"` — `72 passed, 11 deselected, 0 failures` (`tests/test_crawler.py`: 13 passed); `-m real` não reexecutado (Phase 4 não toca transform/zipcsv/db)
+- [x] Static analysis scoped to changed files — `python3 -m compileall -q etl_prf tests` — `0 errors (baseline: n/a)`
+- [x] Lint / formatting — não há ferramenta no projeto (plan, Deferred) — n/a
+- [x] Any artifact the change is expected to (re)produce — `python3 -c "…descobrir(requests.Session())…"` contra a página real (1 requisição): `10 True False [] [] []` (10 pares, iguais ao README, sem fallback, sem divergências, sem avisos)
 
 ## Wrap up
 
