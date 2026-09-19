@@ -211,6 +211,6 @@
 
 ## Wrap up
 
-- [ ] PR opened (`<branch>` → `main`)
-- [ ] Spec linked from the issue (#1)
-- [ ] Follow-up issues created and listed here (spec/plan reference them on their next revision)
+- [ ] PR opened (`<branch>` → `main`) — adiado por decisão do usuário (2026-09-19); alterações de spec.md/validation.md ainda sem commit
+- [x] Spec linked from the issue (#1) — comentário publicado em 2026-09-19 com o resultado da validação
+- [x] Follow-ups listados (issues não criadas, a pedido do usuário): lint/tipagem (ruff/mypy + pre-commit); D-12 no README (banco interno, não atribuir dados alterados à PRF); trava contra execuções simultâneas (AU-12)
