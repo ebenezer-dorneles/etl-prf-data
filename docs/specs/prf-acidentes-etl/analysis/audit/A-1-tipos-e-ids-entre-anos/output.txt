@@ -1,0 +1,22 @@
+2017 nao_parseavel: {} exemplos: {}
+  outros_nulos: {} | brancos/espacos: {} | extra_do_pandas_default: {}
+2018 nao_parseavel: {'id': 2} exemplos: {'id': '1e+05'}
+  outros_nulos: {} | brancos/espacos: {'tipo_acidente': 55} | extra_do_pandas_default: {'tipo_acidente': 55}
+2019 nao_parseavel: {'id': 2} exemplos: {'id': '2e+05'}
+  outros_nulos: {} | brancos/espacos: {'tipo_acidente': 40} | extra_do_pandas_default: {'tipo_acidente': 40}
+2020 nao_parseavel: {'id': 6} exemplos: {'id': '3e+05'}
+  outros_nulos: {} | brancos/espacos: {'tipo_acidente': 1} | extra_do_pandas_default: {'tipo_acidente': 1}
+2021 nao_parseavel: {'id': 30} exemplos: {'id': '4e+05'}
+  outros_nulos: {} | brancos/espacos: {} | extra_do_pandas_default: {}
+2022 nao_parseavel: {} exemplos: {}
+  outros_nulos: {} | brancos/espacos: {} | extra_do_pandas_default: {}
+2023 nao_parseavel: {} exemplos: {}
+  outros_nulos: {} | brancos/espacos: {} | extra_do_pandas_default: {}
+2024 nao_parseavel: {'id': 3} exemplos: {'id': '6e+05'}
+  outros_nulos: {} | brancos/espacos: {} | extra_do_pandas_default: {}
+2025 nao_parseavel: {} exemplos: {}
+  outros_nulos: {} | brancos/espacos: {} | extra_do_pandas_default: {}
+2026 nao_parseavel: {} exemplos: {}
+  outros_nulos: {} | brancos/espacos: {} | extra_do_pandas_default: {}
+ids repetidos entre anos:
+fim

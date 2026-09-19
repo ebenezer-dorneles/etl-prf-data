@@ -1,0 +1,5 @@
+google_crc32c nao instalado
+crc32c nao instalado
+crcmod nao instalado
+zlib.crc32c: False
+bytes 7716046 crc32c zauaUg== esperado (E-3) zauaUg== IGUAL 2.7s
