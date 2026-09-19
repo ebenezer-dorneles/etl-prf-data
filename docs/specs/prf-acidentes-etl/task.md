@@ -29,12 +29,17 @@
 - [x] Phase 5 — Done when: testes verdes; nenhum `.part` sobra após falha (testado em cada falha)
 - [ ] Phase 5 — AC-11/AC-12 (contagem de GETs) ficam em `test_pipeline.py` na Phase 7, conforme a Coverage do plan
 
+- [x] Phase 6 — Red: `tests/test_latest.py` (AC-13, AC-14, AC-15, AC-30, AC-31, AC-32, AC-33, AC-37, AC-39, AC-41, NFR-3; `probe_headers`; tabela de `decidir_acao`)
+- [x] Phase 6 — Green: `drive.probe_headers`, `pipeline.decidir_acao`/`atualizar_ano`; `db.carregar_ano(fechar, avisos)` e `db.registrar_pulado(drive, mensagem)`
+- [x] Phase 6 — Refactor: `decidir_acao` pura; `_cabecalhos` compartilhado entre sonda e download
+- [x] Phase 6 — Done when: testes verdes; sonda = 1 GET (NFR-3, contado em AC-13)
+
 ## State Handover
 
-- Done: Phase 5 completa e verificada (87 testes `not real` verdes; `test_drive.py` 15 passed). Fases 1–4 seguem verdes.
-- Next: Phase 6 (ano mais recente: `probe_headers`, `decidir_acao`, fechamento, `--force`) — rodar `/ssd-workflow:ssd-task` de novo; decompor só a Phase 6.
+- Done: Phase 6 completa e verificada (106 testes `not real` verdes; `test_latest.py` 19 passed). Fases 1–5 seguem verdes.
+- Next: Phase 7 (isolamento de falhas, CLI e resumo) — rodar `/ssd-workflow:ssd-task` de novo; decompor só a Phase 7. Inclui o item aberto da Phase 5 (AC-11/AC-12, contagem de GETs em `test_pipeline.py`).
 - Blockers / open decisions: nenhum; sem CR aberto.
-- Watch out: (1) `drive.download_validated(session, id_, destino, ano, force=False) -> Validacao(content_length, x_goog_hash, last_modified, avisos)`; levanta `EtlError`; a sessão precisa de `get(url, stream=True, timeout=)` com `.headers`, `.iter_content`, `.close`. Os `Validacao` alimentam as colunas `drive_*` de `etl_log` e o aviso do resumo (AC-40). (2) Ordem das validações: tamanho → é ZIP → crc32c (HTML de confirmação dá "resposta não é ZIP", não "sem crc32c"). (3) `probe_headers` (Phase 6) deve reaproveitar a leitura de cabeçalhos e `parse_goog_hash`; AC-41 usa a mesma mensagem "x-goog-hash sem crc32c". (4) `FakeSession`/`Resp` de streaming estão em `tests/test_drive.py`, os do crawler em `tests/test_crawler.py`; consolidar em `conftest.py` se a Phase 6/7 precisar de ambos. (5) Herdados: API de `db.py`/`crawler.descobrir` (Phase 3/4), RSS 717 MB em 2017 (medir 2024 na Phase 8), usar `-m "not real"` no ciclo.
+- Watch out: (1) `pipeline.atualizar_ano(conn, session, ano, id_, pasta, *, force=False, fechar=False) -> Resultado(ano, status, mensagem, avisos)`; status `ok`/`pulado`/`erro`/`fechado` (este último = já fechado, sem GET nem gravação; a Phase 7 deve tratar ano fechado pelo caminho geral com `registrar_pulado`, AC-39). Só captura `EtlError` (grava linha `erro`); outras exceções (OSError, sqlite) sobem — a Phase 7 isola. (2) Chamar `atualizar_ano` só para o ano mais recente e, com `fechar=True`, para o ano anterior quando um mais novo aparece na página; anos fechados não passam por aqui. (3) `--force` ainda faz a sonda (2 GETs); a Phase 7 propaga `force` só ao ano mais recente. (4) Avisos (`crc32c ausente…`) vão em `Resultado.avisos` e em `etl_log.mensagem`; o resumo os lê de `Resultado`. (5) Os 4 fakes de sessão (`test_drive.Resp/FakeSession`, `test_crawler`, `test_latest.Sessao`) coexistem; `test_latest` importa `Resp`, `goog`, `resp_ok` de `test_drive` — consolidar em `conftest.py` na Phase 7 se o pipeline completo precisar. (6) Herdados: RSS 717 MB em 2017 (medir 2024 na Phase 8), usar `-m "not real"` no ciclo.
 
 ## Deviations
 
@@ -53,6 +58,10 @@
 - 2026-09-19 — `content-length` ausente na resposta falha com "content-length ausente" e falha de rede/HTTP vira `EtlError("download falhou: …")`; a spec não descreve esses casos · class: local · action: continuado
 - 2026-09-19 — `drive.py` importa `_atualizar` (privado) de `crc32c.py` para calcular o crc32c em stream durante a gravação, sem reler o arquivo · class: local · action: continuado
 - 2026-09-19 — AC-11/AC-12 não são testados aqui: o plan os põe em `test_pipeline.py` (Phase 7), pois dependem do pipeline decidir baixar ou não · class: local · action: continuado; item aberto no Checklist
+
+- 2026-09-19 — `probe_headers` mora em `drive.py` e a decisão/orquestração do ano mais recente em `pipeline.py` (`decidir_acao`, `atualizar_ano`, `Resultado`), como a tabela de módulos do plan; `db.carregar_ano` ganhou `fechar` e `avisos`, `db.registrar_pulado` ganhou `drive` e `mensagem` (AC-32, AC-33, AC-41) · class: local · action: continuado
+- 2026-09-19 — Referência sem cabeçalhos do Drive (`drive_content_length` nulo) compara o `content-length` com o tamanho registrado, e o crc32c só é comparado quando os dois lados o têm; a spec não descreve esses casos · class: local · action: continuado
+- 2026-09-19 — `atualizar_ano` sempre sonda, mesmo com `--force` (a spec não diz se `--force` dispensa a sonda); os cabeçalhos ficam registrados e a contagem de GETs é 2 · class: local · action: continuado; Handover avisa a Phase 7
 
 ## Execution Log
 
@@ -92,6 +101,13 @@
 - Gate conferido: plan #1 na rev 6, aprovação da rev 6, sem CR aberto; `phase: implementing` já gravada.
 - Red: `tests/test_drive.py` (15 testes) escrito antes do código; coleta falhou com `ModuleNotFoundError: etl_prf.drive`.
 - Green: `drive.py` e `URL_DOWNLOAD`; 15 testes passaram de primeira.
+- Desvios locais registrados acima.
+
+### 2026-09-19 — Phase 6: ano mais recente (sondagem, fechamento, `--force`)
+
+- Gate conferido: plan #1 na rev 6, aprovação da rev 6, sem CR aberto; `phase: implementing` já gravada.
+- Red: `tests/test_latest.py` escrito antes do código; coleta falhou com `ImportError: cannot import name 'probe_headers'`.
+- Green: `probe_headers`, `pipeline.py`, extensões em `db.py`; 19 testes passaram; três testes (AC-14, AC-31, AC-41) reescritos depois para ficarem legíveis, sem mudar o que verificam.
 - Desvios locais registrados acima.
 
 ## Verification
@@ -140,6 +156,14 @@
 - [x] Static analysis scoped to changed files — `python3 -m compileall -q etl_prf tests` — `0 errors (baseline: n/a)`
 - [x] Lint / formatting — não há ferramenta no projeto (plan, Deferred) — n/a
 - [x] Any artifact the change is expected to (re)produce — nenhum; `ls *.part` na raiz: nenhum arquivo sobrando
+
+### Pass — Phase 6 — 2026-09-19
+
+- [x] Red confirmed — `python3 -m pytest -q tests/test_latest.py` — `1 error de coleta: ImportError probe_headers (19 testes ainda não coletados)`
+- [x] Full test suite — `python3 -m pytest -q -m "not real"` — `106 passed, 11 deselected, 0 failures` (`tests/test_latest.py`: 19 passed); `-m real` não reexecutado (Phase 6 não toca transform/zipcsv; `carregar_ano` só ganhou parâmetros opcionais, coberto por `test_db.py`)
+- [x] Static analysis scoped to changed files — `python3 -m compileall -q etl_prf tests` — `0 errors (baseline: n/a)`
+- [x] Lint / formatting — não há ferramenta no projeto (plan, Deferred) — n/a
+- [x] Any artifact the change is expected to (re)produce — nenhum; contagem de requisições (NFR-3) conferida em `test_ac13…` (1 GET) e `ls *.part`: nenhum arquivo sobrando
 
 ## Wrap up
 

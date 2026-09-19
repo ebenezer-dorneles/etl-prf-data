@@ -87,13 +87,16 @@ def _gravar_log(conn, ano, origem, status, linhas, tamanho, sha256, drive, fecha
     )
 
 
-def carregar_ano(conn: sqlite3.Connection, ano: int, caminho: Path, origem: str, drive: dict | None = None) -> int:
+def carregar_ano(
+    conn: sqlite3.Connection, ano: int, caminho: Path, origem: str, drive: dict | None = None,
+    fechar: bool = False, avisos: list[str] = (),
+) -> int:
     """Apaga e reinsere o ano numa transação, junto da linha `ok` do log (FR-4, AC-8).
 
     Qualquer exceção desfaz tudo e é repassada; quem chama registra o `erro`.
     """
     imp = impressao(caminho)
-    fechado = esta_fechado(conn, ano)
+    fechado = fechar or esta_fechado(conn, ano)
     linhas = 0
     falhas: dict[str, int] = {}
     conn.execute("BEGIN")
@@ -105,7 +108,10 @@ def carregar_ano(conn: sqlite3.Connection, ano: int, caminho: Path, origem: str,
                 falhas[nome] = falhas.get(nome, 0) + n
             conn.executemany(SQL_INSERT_ACIDENTE, [(*t, ano) for t in saida.itertuples(index=False, name=None)])
             linhas += len(saida)
-        mensagem = "falhas de conversão (NULL): " + ", ".join(f"{c}: {n}" for c, n in falhas.items()) if falhas else None
+        partes = list(avisos)
+        if falhas:
+            partes.append("falhas de conversão (NULL): " + ", ".join(f"{c}: {n}" for c, n in falhas.items()))
+        mensagem = "; ".join(partes) or None
         _gravar_log(conn, ano, origem, "ok", linhas, imp.tamanho, imp.sha256, _drive(drive), fechado, mensagem)
         conn.execute("COMMIT")
     except BaseException:
@@ -114,14 +120,20 @@ def carregar_ano(conn: sqlite3.Connection, ano: int, caminho: Path, origem: str,
     return linhas
 
 
-def registrar_pulado(conn: sqlite3.Connection, ano: int, origem: str, fechado: bool = False) -> None:
-    """Linha `pulado` repetindo tamanho, sha256 e cabeçalhos da referência (AC-7, D-26/27)."""
+def registrar_pulado(
+    conn: sqlite3.Connection, ano: int, origem: str, fechado: bool = False,
+    drive: dict | None = None, mensagem: str | None = None,
+) -> None:
+    """Linha `pulado` repetindo tamanho e sha256 da referência (AC-7, D-26/27).
+
+    Os cabeçalhos são os da referência, salvo `drive` (sondagem atual, AC-32).
+    """
     ref = referencia(conn, ano)
     if ref is None:
         raise ValueError(f"ano {ano} sem referência para registrar pulado")
-    drive = (ref.drive_content_length, ref.drive_x_goog_hash, ref.drive_last_modified)
+    cabecalhos = _drive(drive) if drive else (ref.drive_content_length, ref.drive_x_goog_hash, ref.drive_last_modified)
     marca = fechado or esta_fechado(conn, ano)
-    _gravar_log(conn, ano, origem, "pulado", None, ref.tamanho, ref.sha256, drive, marca, None)
+    _gravar_log(conn, ano, origem, "pulado", None, ref.tamanho, ref.sha256, cabecalhos, marca, mensagem)
 
 
 def registrar_erro(conn: sqlite3.Connection, ano: int, origem: str, mensagem: str, drive: dict | None = None) -> None:

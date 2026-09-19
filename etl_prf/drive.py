@@ -48,20 +48,39 @@ def download_validated(session, id_: str, destino: Path, ano: int, force: bool =
         parcial.unlink(missing_ok=True)
 
 
-def _gravar(resp, parcial: Path, ano: int) -> tuple[Validacao, int]:
-    cabecalhos = {k.lower(): v for k, v in resp.headers.items()}
-    anunciado = cabecalhos.get("content-length")
+def _cabecalhos(resp, ano: int) -> Validacao:
+    cab = {k.lower(): v for k, v in resp.headers.items()}
+    anunciado = cab.get("content-length")
     if anunciado is None or not anunciado.isdigit():
         raise EtlError(ano, "content-length ausente na resposta do Drive")
+    return Validacao(int(anunciado), cab.get("x-goog-hash"), cab.get("last-modified"))
+
+
+def probe_headers(session, id_: str, ano: int) -> Validacao:
+    """Lê só os cabeçalhos do ZIP no Drive e fecha a resposta sem ler o corpo (D-19)."""
+    resp = None
+    try:
+        resp = session.get(URL_DOWNLOAD.format(id=id_), stream=True, timeout=_TIMEOUT)
+        resp.raise_for_status()
+        return _cabecalhos(resp, ano)
+    except requests.RequestException as e:
+        raise EtlError(ano, f"sondagem falhou: {e}") from e
+    finally:
+        if resp is not None:
+            resp.close()
+
+
+def _gravar(resp, parcial: Path, ano: int) -> tuple[Validacao, int]:
+    validacao = _cabecalhos(resp, ano)
     crc, recebido = 0xFFFFFFFF, 0
     with open(parcial, "wb") as f:
         for bloco in resp.iter_content(chunk_size=_BLOCO):
             f.write(bloco)
             crc = _atualizar(crc, bloco)
             recebido += len(bloco)
-    if recebido != int(anunciado):
-        raise EtlError(ano, f"tamanho divergente: recebidos {recebido} bytes, anunciados {anunciado}")
-    return Validacao(int(anunciado), cabecalhos.get("x-goog-hash"), cabecalhos.get("last-modified")), crc ^ 0xFFFFFFFF
+    if recebido != validacao.content_length:
+        raise EtlError(ano, f"tamanho divergente: recebidos {recebido} bytes, anunciados {validacao.content_length}")
+    return validacao, crc ^ 0xFFFFFFFF
 
 
 def _validar(validacao: Validacao, crc: int, parcial: Path, ano: int, force: bool) -> None:
