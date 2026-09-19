@@ -1,8 +1,8 @@
 ---
 issues: []
 status: in-progress
-phase: auditing
-spec-revision: 2
+phase: approved
+spec-revision: 6
 tier: M
 ---
 
@@ -82,11 +82,11 @@ Marcadores de nulo: `NA`, `N/A` e string vazia viram NULL; nenhum outro texto vi
 
 ### FR-4 — Reexecução sem duplicar
 
-Cada ano é carregado numa única transação: apaga as linhas do ano e insere as novas. "Ano inalterado" significa que o ZIP tem o mesmo tamanho e o mesmo sha256 do ZIP da última carga com status `ok` em `etl_log`; nesse caso o ano é pulado. (UC-5, D-10, D-16)
+Cada ano é carregado numa única transação: apaga as linhas do ano e insere as novas. "Ano inalterado" significa que o ZIP tem o mesmo tamanho e o mesmo sha256 do ZIP da linha de referência em `etl_log` (a mais recente com status `ok` ou `pulado`, D-26); nesse caso o ano é pulado e a execução grava uma linha `pulado`. (UC-5, D-10, D-16, D-26)
 
-- **AC-7** — Given o banco já carregado, when o ETL roda de novo sem mudanças, then as contagens por ano são idênticas e nenhum ZIP é reprocessado.
+- **AC-7** — Given o banco já carregado, when o ETL roda de novo sem mudanças, then as contagens por ano são idênticas, nenhum ZIP é reprocessado e cada ano pulado ganha em `etl_log` uma linha `pulado` que repete tamanho, sha256 e cabeçalhos da referência.
 - **AC-8** — Given uma carga que falha no meio de um ano, when a transação é desfeita, then o banco mantém as linhas anteriores desse ano intactas (nem parcial nem duplicado).
-- **AC-24** — Given o ZIP local de 2019 substituído por uma versão com sha256 diferente da última carga `ok`, when o ETL roda, then o ano 2019 é recarregado (apaga e reinsere) e os demais são pulados.
+- **AC-24** — Given o ZIP local de 2019 substituído por uma versão com sha256 diferente da referência (`ok` ou `pulado`), when o ETL roda, then o ano 2019 é recarregado (apaga e reinsere) e os demais são pulados.
 
 ### FR-5 — Descobrir os links na página da PRF
 
@@ -100,28 +100,34 @@ O crawler acessa a página de dados abertos da PRF, filtra as linhas `Documento 
 
 ### FR-6 — Baixar só o que falta
 
-O ETL baixa do Drive apenas os anos fechados cujo ZIP não esteja na raiz do projeto, e anos novos ainda sem ZIP (D-22). O ano mais recente segue FR-7. O download vai para um arquivo temporário e só substitui o ZIP local depois de validado: `content-length` recebido igual ao anunciado, `crc32c` igual ao de `x-goog-hash` e conteúdo ZIP (D-17). (UC-1, UC-3, D-7)
+O ETL baixa do Drive apenas os anos fechados cujo ZIP não esteja na raiz do projeto, e anos novos ainda sem ZIP (D-22). O ano mais recente segue FR-7. O download vai para um arquivo temporário e só substitui o ZIP local depois de validado: `content-length` recebido igual ao anunciado, `crc32c` igual ao de `x-goog-hash` e conteúdo ZIP (D-17). O `crc32c` é calculado em Python puro, sem nova dependência (D-25). Do cabeçalho `x-goog-hash` extrai-se o item `crc32c=`, decodifica-se de base64 (4 bytes big-endian) e compara-se com o valor calculado como inteiro de 32 bits; cabeçalho sem `crc32c=` falha o download, salvo com `--force`, que valida só `content-length` e conteúdo ZIP e registra um aviso no log e no resumo (D-28, D-29). (UC-1, UC-3, D-7, D-25, D-28, D-29)
 
 - **AC-11** — Given o ZIP de 2019 ausente da pasta e os demais presentes, when o ETL roda, then só o de 2019 é baixado (1 download) e carregado.
 - **AC-12** — Given todos os ZIPs de 2017–2025 presentes, when o ETL roda, then não faz download desses anos.
 - **AC-25** — Given um download de 2019 que termina com menos bytes que o `content-length`, when o ETL valida, then falha o ano 2019 com mensagem de tamanho divergente e nenhum ZIP local é criado ou alterado.
+- **AC-36** — Given o valor de teste `crc32c(b"123456789")`, when a função de checksum roda, then devolve `0xE3069283` (vetor padrão do CRC-32C), e o valor calculado sobre o ZIP de 2026 (7 716 046 bytes) é igual ao de `x-goog-hash` (A-2).
+- **AC-38** — Given `x-goog-hash: crc32c=zauaUg==,md5=abc` e o ZIP de 2026 (7 716 046 bytes), when o ETL valida, then extrai `crc32c=zauaUg==`, decodifica para `0xCDAB9A52` e o compara com o `crc32c` calculado, que é igual; e given um `x-goog-hash` sem `crc32c=` (só `md5=abc`), then, sem `--force`, falha o download com mensagem "x-goog-hash sem crc32c" (dica: `--force`) e nenhum ZIP local é criado ou alterado.
+- **AC-40** — Given o mesmo `x-goog-hash` sem `crc32c=` e `--force`, com `content-length` recebido igual ao anunciado e conteúdo ZIP, when o ETL valida, then o ZIP é aceito e carregado, e o log e o resumo trazem o aviso "crc32c ausente, validado só por tamanho e formato"; com `content-length` divergente falha como no AC-25.
 - **AC-26** — Given um download com `crc32c` diferente do de `x-goog-hash`, when o ETL valida, then falha o ano com mensagem de checksum divergente e o ZIP local anterior (se existir) permanece intacto.
 
 ### FR-7 — Manter o ano mais recente atualizado
 
-Ao rodar, o ETL consulta os cabeçalhos do ZIP do ano mais recente (hoje 2026) por GET em stream lendo só os cabeçalhos e fechando sem baixar o corpo (D-19). Considera mudado se `content-length` ou o `crc32c` de `x-goog-hash` diferem dos da última carga `ok`; `last-modified` só é registrado. Sem carga `ok` anterior e com ZIP local presente, carrega o ZIP local se o `content-length` do Drive for igual ao tamanho local, senão baixa (D-24). Uma linha `erro` em `etl_log` nunca substitui essa referência (D-16). Quando um ano mais novo aparece, o ano anterior recebe uma última verificação e passa a ser fechado (D-22). `--force` recarrega o ano mais recente sem comparar. Não há agendador. (UC-2, D-4)
+Ao rodar, o ETL consulta os cabeçalhos do ZIP do ano mais recente (hoje 2026) por GET em stream lendo só os cabeçalhos e fechando sem baixar o corpo (D-19). Considera mudado se `content-length` ou o `crc32c` de `x-goog-hash` (lido como em FR-6, D-28) diferem dos da linha de referência (`ok` ou `pulado`, D-26); se o cabeçalho não traz `crc32c=`, compara só o `content-length` e registra um aviso (D-29); `last-modified` só é registrado. Sem linha de referência e com ZIP local presente, carrega o ZIP local se o `content-length` do Drive for igual ao tamanho local, senão baixa (D-24). Uma linha `erro` em `etl_log` nunca substitui essa referência (D-16, D-26). Quando um ano mais novo aparece, o ano anterior recebe uma última verificação de cabeçalhos, registrada com `fechado` = 1 na linha desse ano em `etl_log` só se os cabeçalhos foram lidos com sucesso. Um ano é fechado se existe qualquer linha `ok` ou `pulado` dele com `fechado` = 1, e as linhas seguintes do ano repetem a marca (D-27); a partir daí não é mais consultado no Drive. Se a leitura falhar, `fechado` não é gravado e a verificação se repete na próxima execução (D-22, D-26, D-27). `--force` recarrega o ano mais recente sem comparar e aceita downloads sem `crc32c=` (FR-6, D-29). Não há agendador. (UC-2, D-4)
 
 - **AC-13** — Given o 2026 já carregado e o Drive com os mesmos `content-length` e `x-goog-hash`, when o ETL roda, then não baixa o ZIP e o banco fica igual.
 - **AC-14** — Given o Drive com `x-goog-hash` diferente do registrado, when o ETL roda, then baixa o ZIP e recarrega o ano 2026 (FR-4), registrando os novos cabeçalhos.
 - **AC-15** — Given `--force`, when o ETL roda, then recarrega o 2026 mesmo com cabeçalhos iguais.
 - **AC-30** — Given nenhuma carga `ok` de 2026 e o ZIP local de 7 716 046 bytes, when o Drive anuncia `content-length` 7 716 046, then carrega o ZIP local sem baixar; e quando anuncia outro valor, então baixa e carrega o do Drive.
-- **AC-31** — Given uma execução em que o 2026 falhou (linha `erro` com cabeçalhos novos), when o ETL roda de novo, then compara com os cabeçalhos da última linha `ok` (não com os da linha `erro`) e tenta recarregar.
+- **AC-31** — Given uma execução em que o 2026 falhou (linha `erro` com cabeçalhos novos), when o ETL roda de novo, then compara com os cabeçalhos da última linha `ok` ou `pulado` (não com os da linha `erro`) e tenta recarregar.
 - **AC-32** — Given só o `last-modified` diferente (`content-length` e `crc32c` iguais), when o ETL roda, then não baixa o ZIP e registra o novo `last-modified`.
-- **AC-33** — Given 2026 carregado e a página listando também 2027, when o ETL roda, then baixa e carrega o 2027 (FR-6), consulta uma última vez os cabeçalhos do 2026 (recarrega se mudaram) e nas execuções seguintes 2026 não é mais consultado no Drive.
+- **AC-33** — Given 2026 carregado e a página listando também 2027, when o ETL roda, then baixa e carrega o 2027 (FR-6), consulta uma última vez os cabeçalhos do 2026 (recarrega se mudaram), grava `fechado` = 1 na linha do 2026 em `etl_log` e nas execuções seguintes 2026 não é mais consultado no Drive.
+- **AC-39** — Given 2026 com uma linha `ok` com `fechado` = 1 e, depois, uma execução que gravou `pulado` para 2026, when o ETL roda de novo, then a linha `pulado` repete `fechado` = 1 e o 2026 continua sem consulta ao Drive.
+- **AC-41** — Given o Drive respondendo o 2026 sem `crc32c=` em `x-goog-hash`, o `content-length` igual ao da referência e sem `--force`, when o ETL roda, then não baixa o ZIP, registra o aviso de crc32c ausente e o banco fica igual; e com `content-length` diferente tenta baixar e falha com a mensagem do AC-38, sem alterar o ZIP local nem as linhas do ano.
+- **AC-37** — Given 2027 listado na página e a leitura dos cabeçalhos do 2026 falhando por rede, when o ETL roda, then `fechado` do 2026 não é gravado, a falha é registrada, e na execução seguinte (rede ok) os cabeçalhos do 2026 são consultados de novo e `fechado` = 1 é gravado.
 
 ### FR-8 — Tolerar falha por arquivo e registrar
 
-Erro de rede, cota, resposta HTML em vez de ZIP, ZIP inválido, ZIP sem exatamente um CSV ou CSV com cabeçalho diferente dos 37 campos em um ano é registrado com mensagem clara e não impede os outros anos. Cada execução deixa um registro por ano na tabela `etl_log` (ano, origem, status, linhas, tamanho e sha256 do ZIP, cabeçalhos do Drive, mensagem, timestamp). O processo termina com código ≠ 0 se algum ano falhou. (UC-4, D-6, D-9, D-16, D-21)
+Erro de rede, cota, resposta HTML em vez de ZIP, ZIP inválido, ZIP sem exatamente um CSV ou CSV com cabeçalho diferente dos 37 campos em um ano é registrado com mensagem clara e não impede os outros anos. Cada execução deixa um registro por ano na tabela `etl_log` (ano, origem, status ∈ {`ok`, `pulado`, `erro`}, linhas, tamanho e sha256 do ZIP, cabeçalhos do Drive, `fechado` (D-27), mensagem, timestamp; D-26). O processo termina com código ≠ 0 se algum ano falhou. (UC-4, D-6, D-9, D-16, D-21, D-26)
 
 - **AC-16** — Given o download de 2019 falha (HTTP 429) e os demais ok, when o ETL roda, then 2019 aparece em `etl_log` com status `erro` e a mensagem, os demais anos carregam, e o código de saída é ≠ 0.
 - **AC-17** — Given um arquivo baixado que é HTML de confirmação/cota e não ZIP, when o ETL o valida, then falha o ano com mensagem "resposta não é ZIP" e não toca nas linhas já carregadas desse ano.
@@ -130,7 +136,7 @@ Erro de rede, cota, resposta HTML em vez de ZIP, ZIP inválido, ZIP sem exatamen
 
 ### FR-9 — Interface de linha de comando
 
-O ETL roda por `python -m etl_prf`, com a opção `--force` (FR-7). O banco é `data/prf.sqlite` (a pasta `data/` é criada se faltar) e os ZIPs baixados ficam na raiz do projeto. (UC-1, UC-2, D-23)
+O ETL roda por `python -m etl_prf`, com a opção `--force` (FR-7, FR-6, D-29). O banco é `data/prf.sqlite` (a pasta `data/` é criada se faltar) e os ZIPs baixados ficam na raiz do projeto. (UC-1, UC-2, D-23)
 
 - **AC-34** — Given um checkout sem `data/`, when se roda `python -m etl_prf`, then cria `data/prf.sqlite` com `acidentes` e `etl_log`, e os ZIPs baixados (se houver) ficam na raiz.
 - **AC-35** — Given todos os anos ok, when o ETL termina, then o código de saída é 0 e o resumo por ano é impresso (NFR-2).
@@ -152,6 +158,7 @@ O ETL roda por `python -m etl_prf`, com a opção `--force` (FR-7). O banco é `
 | Página gov.br da PRF (HTML pode mudar) | dependency | PRF | crawler não acha links → fallback (AC-10) |
 | Google Drive (`uc?export=download`, cota/confirmação de vírus) | dependency | Google | download falha → FR-8; cota só se observa em uso real (Q-6) |
 | Python 3.14, pandas 3.0.5, requests, bs4 já instalados | constraint | usuário | ver D-1 |
+| `crc32c` em Python puro (nenhuma lib instalada o calcula; ~2,7 s para 7,7 MB, A-2) | constraint | agente | sem nova dependência (D-25); ZIPs de 13 MB levam ~5 s, aceitável (NFR-1 só limita memória) |
 | Citar a PRF como fonte; não atribuir à PRF dados alterados | constraint | usuário | risco de licença (CC BY-ND do portal, `reported`) |
 | Execução local, sem orquestrador | constraint | usuário | — |
 
@@ -237,7 +244,7 @@ O ETL roda por `python -m etl_prf`, com a opção `--force` (FR-7). O banco é `
   - Why: FR-3 tipa 6 colunas; `id`, `pesid`, `id_veiculo`, `ordem_tipo_acidente`, `ilesos`, `feridos_leves`, `feridos_graves` e `mortos` também parseiam como inteiro em todos os anos (A-1), o resto é texto. Índices em `ano`, `id` e `data_inversa` porque são 4,4 milhões de linhas e não há chave única (D-10).
   - Ruled out: tudo texto além das 6 colunas — empurra a conversão para as consultas; chave primária composta — as colunas da chave candidata aceitam NULL.
 - **D-16 — "Ano inalterado" = impressão digital (tamanho + sha256) do ZIP da última carga `ok` em `etl_log`; o 2026 na primeira execução carrega o ZIP local sem baixar; os cabeçalhos do Drive de referência vêm da última linha `ok`, nunca de uma linha `erro`** · type: technical · decided-by: agent · evidence: E-3
-  - Why: FR-4/AC-7 não definem o critério; sem isso uma falha grava cabeçalhos novos e o 2026 nunca recarrega.
+  - Why: FR-4/AC-7 não definem o critério; sem isso uma falha grava cabeçalhos novos e o 2026 nunca recarrega. Refinado por D-26: a referência inclui as linhas `pulado`.
   - Ruled out: mtime — muda ao copiar o arquivo; contagem de linhas — não detecta correção de valores.
 - **D-17 — Download vai para arquivo temporário, é validado (`content-length` e `crc32c` de `x-goog-hash`, além de ser ZIP) e só então substitui o ZIP local** · type: technical · decided-by: agent · evidence: E-3
   - Why: AC-17 só verifica se é ZIP; um download truncado ou interrompido corromperia o ZIP local existente.
@@ -271,6 +278,18 @@ O ETL roda por `python -m etl_prf`, com a opção `--force` (FR-7). O banco é `
   - Why: a spec não define o vocabulário de `status` nem como AC-33 sabe que a última consulta do ano já ocorreu.
   - Ruled out: só `ok`/`erro` — uma execução que pulou o ano perderia a referência; inferir "fechado" do ano do arquivo — repetiria a consulta ao Drive sem fim.
 
+- **D-27 — Um ano é fechado se existe qualquer linha `ok` ou `pulado` dele em `etl_log` com `fechado` = 1; as linhas seguintes do ano repetem a marca** · type: technical · decided-by: agent · evidence: —
+  - Why: a referência é "a mais recente" (D-26) e o FR-4 grava uma linha `pulado` por execução; sem a regra, uma linha posterior perderia a marca e o ano voltaria a ser consultado no Drive (AC-33).
+  - Ruled out: ler `fechado` só da linha mais recente — a marca se perde; tabela separada de anos fechados — complexidade sem ganho.
+- **D-28 — `crc32c` de `x-goog-hash`: extrair o item `crc32c=`, decodificar de base64 (4 bytes big-endian) e comparar com o valor calculado como inteiro de 32 bits; cabeçalho sem `crc32c=` falha o download com mensagem clara** · type: technical · decided-by: agent · evidence: A-2, E-3
+  - Why: E-3 mostra `zauaUg==`; o cabeçalho pode listar mais de um hash.
+  - Refinado por D-29: `--force` aceita a ausência.
+  - Ruled out: comparar a string inteira do cabeçalho — quebra com `md5=` extra; ignorar a ausência do `crc32c` — o download ficaria sem validação de conteúdo.
+
+- **D-29 — Sem `crc32c=` em `x-goog-hash`: o download falha por padrão; com `--force` valida só `content-length` e conteúdo ZIP, com aviso no log e no resumo; a sondagem do ano mais recente compara só o `content-length`, com aviso** · type: product · decided-by: user (ebenezerdorneles, 2026-09-19, AU-23, opção c) · evidence: E-3
+  - Why: integridade por padrão, com saída explícita se o Drive parar de enviar o hash. A regra da sondagem sem `--force` é consequência técnica da escolha: sem hash só se compara o tamanho, e um download que daí resulte falha sem `--force`.
+  - Ruled out: (a) falhar sempre — o ETL para de carregar downloads até alguém intervir; (b) aceitar sempre sem hash — perde a validação de conteúdo sem o usuário saber.
+
 ---
 
 ## Risks & assumptions
@@ -283,6 +302,8 @@ O ETL roda por `python -m etl_prf`, com a opção `--force` (FR-7). O banco é `
 | O ano do arquivo local é o do nome do ZIP (`acidentes<ano>_…`) | assumption | recarga do ano errado | AC-1 e validação do nome do ZIP |
 | Mudança de esquema em anos futuros (colunas novas) | risk | cabeçalho diferente dos 37 campos | AC-18 falha o ano com a lista de divergências |
 | `id` como `1e+05` representa exatamente 100000 (só o primeiro exemplo por coluna foi visto, A-1) | assumption | `id` errado nessas 43 linhas | D-13 converte só inteiros exatos; o verify confere os valores convertidos contra o CSV |
+| `x-goog-hash` pode listar vários hashes (`crc32c=...,md5=...`); só `crc32c=` sozinho foi observado (E-3) | assumption | download validado errado ou falha com "sem crc32c" | D-28: o parser separa por vírgula e ignora espaços; AC-38; `--force` como saída (D-29) |
+| Sem `crc32c=` em `x-goog-hash`, a sondagem compara só o `content-length` (D-29, AC-41) | risk (AU-24) | correção da PRF que mantém o mesmo tamanho passa despercebida e o banco do ano mais recente fica defasado | aviso no log e no resumo; `--force` recarrega o ano mais recente |
 | Duas execuções simultâneas disputam o SQLite | risk (aceito, AU-12) | a segunda falha com o banco bloqueado, sem corromper (cada ano é uma transação, FR-4) | sem trava extra; usar uma execução por vez |
 | `Last-Modified`/`x-goog-hash` reflete mudança do conteúdo | assumption | 2026 não é atualizado ou é recarregado sem necessidade | E-3 confirma que os cabeçalhos existem; `--force` como saída |
 
@@ -313,6 +334,7 @@ Banco novo: sem migração de dados. A primeira execução cria `data/prf.sqlite
 
 | Revision | Approved by | Date | Audit section | Notes |
 |---|---|---|---|---|
+| 6 | ebenezerdorneles | 2026-09-19 | Audit — rev 6 — 2026-09-19 | aprovação explícita da rev 6; riscos aceitos: AU-12, AU-21, AU-24 |
 
 ---
 
@@ -322,6 +344,10 @@ Banco novo: sem migração de dados. A primeira execução cria `data/prf.sqlite
 |---|---|---|---|---|
 | 1 | 2026-09-19 | — | initial; addendum 2026-09-19 (Q-1..Q-6, exploration `Affects spec: yes`) | todas as seções |
 | 2 | 2026-09-19 | — | audit AU-1..AU-14 (D-13..D-23) | Goals, Scope/UC coverage; FR-1..FR-8 reescritos, novo FR-9; AC-19..AC-35 novos, AC-10 alterado; NFR-1, NFR-3; Data sources, Interfaces, Impacts, Risks, Migration; D-7 (nota), novo D-24 |
+| 3 | 2026-09-19 | — | audit AU-16..AU-18 (D-25, D-26) | FR-4 (referência `ok`/`pulado`), AC-7, AC-24; FR-6, novo AC-36; FR-7, AC-31, AC-33, novo AC-37; FR-8 (vocabulário e coluna `fechado` de `etl_log`); Constraints & dependencies; D-16 (nota) |
+| 4 | 2026-09-19 | — | audit AU-19, AU-20 (D-27, D-28) | FR-6 (formato de `x-goog-hash`), novos AC-38; FR-7 (regra de `fechado`, leitura do crc32c), novo AC-39; FR-8 (`fechado`) |
+| 5 | 2026-09-19 | — | audit AU-22, AU-23 (D-29; AU-23 opção (c) decidida pelo usuário) | FR-6 (`--force` sem `crc32c=`), AC-38 (ajuste), novo AC-40; FR-7 (sondagem sem `crc32c=`, `--force`), novo AC-41; FR-9; Risks & assumptions (formato de `x-goog-hash`); D-28 (nota), novo D-29 |
+| 6 | 2026-09-19 | — | audit AU-24 | Risks & assumptions (nova linha de risco); nenhuma FR/AC/D alterada |
 
 ---
 
@@ -355,6 +381,46 @@ Delta audit: FR-1..FR-9, AC-19..AC-35, D-13..D-24, NFR-1/NFR-3 e as seções toc
 
 | ID | Item | Type | Severity | Resolution | Status | Decided by | Decision | Evidence |
 |----|------|------|----------|------------|--------|------------|----------|----------|
-| AU-16 | D-17/FR-6/AC-26 exigem conferir o `crc32c`, mas nenhuma lib instalada nem a biblioteca padrão o calcula, e "Constraints" só lista pandas, requests e bs4 | contract | medium | technical | open | agent | D-25 — awaiting spec edit (FR-6, Constraints & dependencies) | A-2 |
-| AU-17 | AC-33 diz que o ano fechado "não é mais consultado", mas não há onde registrar que a verificação final ocorreu; se ela falhar por rede o ano ficaria sem última verificação ou seria consultado para sempre | edge | medium | technical | open | agent | D-26 — awaiting spec edit (FR-7, AC-33, FR-8) | E-3 |
-| AU-18 | `etl_log` não define os valores de `status`; FR-4/FR-7 comparam com "a última carga `ok`", mas uma execução que pulou o ano (AC-7) não é `ok` nem `erro` | quality | medium | technical | open | agent | D-26 — awaiting spec edit (FR-4, FR-8, AC-7) | — |
+| AU-16 | D-17/FR-6/AC-26 exigem conferir o `crc32c`, mas nenhuma lib instalada nem a biblioteca padrão o calcula, e "Constraints" só lista pandas, requests e bs4 | contract | medium | technical | resolved | agent | D-25; FR-6, AC-36, Constraints & dependencies (rev 3; vetor `0xE3069283` conferido no delta audit) | A-2 |
+| AU-17 | AC-33 diz que o ano fechado "não é mais consultado", mas não há onde registrar que a verificação final ocorreu; se ela falhar por rede o ano ficaria sem última verificação ou seria consultado para sempre | edge | medium | technical | resolved | agent | D-26; FR-7, AC-33, AC-37, FR-8 (rev 3; a regra de leitura de `fechado` foi refinada em AU-19) | E-3 |
+| AU-18 | `etl_log` não define os valores de `status`; FR-4/FR-7 comparam com "a última carga `ok`", mas uma execução que pulou o ano (AC-7) não é `ok` nem `erro` | quality | medium | technical | resolved | agent | D-26; FR-4, FR-8, AC-7, AC-24, AC-31 (rev 3) | — |
+
+## Audit — rev 3 — 2026-09-19
+
+Delta audit: FR-4, FR-6, FR-7, FR-8, AC-7, AC-24, AC-31, AC-33, AC-36, AC-37, D-16 (nota), D-25, D-26 e a linha nova de Constraints. AU-16..AU-18 conferidos contra o texto novo (status atualizados acima). Conferido: o CRC-32C de `b"123456789"` em Python puro dá `0xe3069283`, igual ao AC-36; o ZIP 2026 local tem 7 716 046 bytes, igual ao AC-30/A-2.
+
+| ID | Item | Type | Severity | Resolution | Status | Decided by | Decision | Evidence |
+|----|------|------|----------|------------|--------|------------|----------|----------|
+| AU-19 | FR-7/D-26 gravam `fechado` "na linha" do ano, mas não dizem como é lido: o FR-4 grava uma linha `pulado` por ano a cada execução e a referência é "a mais recente", então uma linha `pulado` posterior (sem `fechado`) ou uma recarga poderia apagar a marca e o ano fechado voltaria a ser consultado no Drive (contra AC-33) | edge | medium | technical | resolved | agent | D-27; FR-7, FR-8, AC-39 (rev 4) | — |
+| AU-20 | FR-6/AC-36 comparam o `crc32c` com `x-goog-hash`, mas não dizem o formato: o cabeçalho traz o valor em base64 dos 4 bytes big-endian (`zauaUg==` no E-3) e pode listar mais de um hash (`crc32c=...,md5=...`); sem a regra, o teste do AC-26 e a implementação divergem | contract | low | technical | resolved | agent | D-28; FR-6, FR-7, AC-38 (rev 4; `0xCDAB9A52` conferido no delta audit; ver AU-22) | A-2, E-3 |
+| AU-21 | Cada execução grava uma linha `pulado` por ano em `etl_log` (~10 linhas por execução, sem limpeza) | quality | low | technical | accepted-risk | agent | crescimento desprezível (poucas centenas de bytes por execução); sem rotação | — |
+
+Pressure-test: as decisões D-25 e D-26 não mudam formato externo nem dado armazenado de forma irreversível (a coluna `fechado` é interna e o banco é descartável, ver Migration & rollout), então o eixo 8 não se aplica. A alternativa `google-crc32c` segue descartada (nenhuma edge nova a favorece); ~5 s de crc32c para um ZIP de 13 MB só ocorre em download.
+
+## Audit — rev 4 — 2026-09-19
+
+Delta audit: FR-6 (leitura de `x-goog-hash`), FR-7 (regra de `fechado`), FR-8, AC-38, AC-39, D-27, D-28. AU-19 e AU-20 conferidos contra o texto novo (status atualizados acima): AC-39 cobre a marca que se repete em `pulado`; a decodificação base64 de `zauaUg==` dá `cdab9a52`, igual ao AC-38.
+
+| ID | Item | Type | Severity | Resolution | Status | Decided by | Decision | Evidence |
+|----|------|------|----------|------------|--------|------------|----------|----------|
+| AU-22 | D-28/AC-38 partem de que `x-goog-hash` pode listar vários hashes (`crc32c=...,md5=...`), mas o E-3 só observou `crc32c=zauaUg==` sozinho; o `md5=abc` do AC-38 é um exemplo inventado e o formato com vários itens (e o espaço após a vírgula quando o `requests` junta cabeçalhos repetidos) não está `confirmed` nem em Risks & assumptions | data | low | technical | resolved | agent | Risks & assumptions, linha do formato de `x-goog-hash` (rev 5); parser em D-28 e AC-38 | E-3 |
+| AU-23 | FR-6/D-28 falham o download quando `x-goog-hash` não traz `crc32c=`, e o FR-7 não diz o que a sondagem do 2026 faz nesse caso; se o Drive parar de enviar o hash, o ano mais recente e qualquer ano novo nunca carregam (falha em todas as execuções, só `--force` também falharia na validação) | contract | medium | product | resolved | user (ebenezerdorneles, 2026-09-19) | D-29 (opção c); FR-6, FR-7, FR-9, AC-38, AC-40, AC-41 (rev 5) | E-3 |
+
+Pressão de arquitetura (eixo 8): não se aplica, sem dado irreversível nem contrato novo. AC-38 e AC-39 são checáveis com valores concretos (cabeçalho e hex de teste, sequência `ok`/`pulado`).
+
+## Audit — rev 5 — 2026-09-19
+
+Delta audit: FR-6, FR-7, FR-9, AC-38, AC-40, AC-41, D-28 (nota), D-29 e a linha nova de Risks & assumptions. AU-22 e AU-23 conferidos contra o texto novo (status atualizados acima). D-29 é `product` e foi decidida pelo usuário; AC-40 e AC-41 são checáveis com valores concretos (cabeçalho sem `crc32c=`, `content-length` igual/divergente, com e sem `--force`).
+
+| ID | Item | Type | Severity | Resolution | Status | Decided by | Decision | Evidence |
+|----|------|------|----------|------------|--------|------------|----------|----------|
+| AU-24 | Sem `crc32c=` a sondagem do 2026 compara só o `content-length` (D-29, AC-41): uma correção da PRF que mantenha o tamanho não é detectada e o banco fica defasado, apenas com o aviso no log; o risco não está em Risks & assumptions | edge | low | technical | resolved | agent | Risks & assumptions, linha `risk (AU-24)` (rev 6) | E-3 |
+
+Pressão de arquitetura (eixo 8): não se aplica, sem dado irreversível nem contrato novo. Nada mais a apontar: `--force` só dispensa a *ausência* do `crc32c=`; um `crc32c` presente e divergente continua falhando (AC-26), e o AC-40 mantém a checagem de tamanho.
+
+## Audit — rev 6 — 2026-09-19
+
+Delta audit: só a linha nova de Risks & assumptions (AU-24); a rev 6 não alterou FR, AC nem D (conferido na linha de Revisions). A linha traz a consequência e a mitigação (aviso e `--force`) e cita D-29 e AC-41. AU-24 marcado `resolved`. Nenhum item novo.
+
+Estado de saída: todos os itens AU-1..AU-24 estão `resolved`, `accepted-risk` (AU-12, AU-21) ou `invalid` (AU-15); zero `open`; Q-1..Q-6 resolvidas; sem CR aberto.
+
