@@ -13,12 +13,17 @@
 - [x] Phase 2 — Refactor: `COLUNAS` é a fonte única de DDL e transformação
 - [x] Phase 2 — Done when: `not real` verde; AC-1 confere as 10 contagens; nenhuma linha descartada
 
+- [x] Phase 3 — Red: `tests/test_db.py` (AC-7, AC-8, AC-24, referência ignora `erro`, `fechado` repetido em `pulado`/AC-39, cabeçalhos do Drive, mensagem de falhas)
+- [x] Phase 3 — Green: `etl_prf/db.py` (`conectar`, `impressao`, `referencia`, `esta_fechado`, `ano_inalterado`, `carregar_ano`, `registrar_pulado`, `registrar_erro`) + DDL de `etl_log` em `schema.py`
+- [x] Phase 3 — Refactor: DDL e SQL em constantes nomeadas (`DDL_ETL_LOG`, `SQL_*`)
+- [x] Phase 3 — Done when: testes passam e `sqlite3` de banco temporário mostra `ok` + `pulado` esperados (2017 real)
+
 ## State Handover
 
-- Done: Phase 2 completa e verificada (58 testes, 0 falhas; AC-1 confere as 10 contagens dos ZIPs reais, sem falha de conversão em nenhum valor real). Phase 1 segue verde.
-- Next: Phase 3 (recarga transacional, idempotência e `etl_log`) — rodar `/ssd-workflow:ssd-task` de novo; decompor só a Phase 3.
+- Done: Phase 3 completa e verificada (59 testes `not real` verdes; `test_db.py` 12 passed). Fases 1–2 seguem verdes.
+- Next: Phase 4 (crawler e mesclagem com o README) — rodar `/ssd-workflow:ssd-task` de novo; decompor só a Phase 4.
 - Blockers / open decisions: nenhum; sem CR aberto.
-- Watch out: (1) `etl_log` DDL ainda não existe — `schema.py` só tem `acidentes`; a Phase 3 o cria junto de `carregar_ano`. (2) `transformar(chunk)` devolve `(DataFrame de objetos com None, dict falhas por coluna)`; a Phase 3 deve somar as falhas dos chunks do ano para `etl_log.mensagem` (AC-6) e inserir com `executemany` a partir de `saida.itertuples`; coluna `ano` não vem do transform (acrescentar na inserção). (3) `iterar_chunks` é generator: `EtlError` de cabeçalho/nº de CSVs sai no primeiro `next()`, antes de qualquer chunk — chamar dentro do `try`/transação. (4) Memória: pytest com transform de todos os anos chegou a 859 MB de RSS (limite NFR-1 é 1 GiB para a carga completa); a Phase 3+8 acrescenta o SQLite, então medir cedo e reduzir `CHUNKSIZE` se preciso. (5) A suíte completa com `real` leva ~147 s; usar `-m "not real"` (~4 s) no ciclo Red/Green.
+- Watch out: (1) API de `db.py` para o pipeline: `carregar_ano(conn, ano, zip, origem, drive=dict(content_length, x_goog_hash, last_modified))` só faz commit no sucesso e repassa a exceção — quem chama deve chamar `registrar_erro` (com `drive` se leu cabeçalhos). `registrar_pulado(conn, ano, origem, fechado=False)` exige referência e repete `fechado` (D-27); `fechado=True` grava a marca da verificação final (Phase 6). `ano_inalterado(conn, ano, impressao(zip))` decide pulo. (2) A conexão usa `isolation_level=None` (BEGIN explícito); `registrar_*` são autocommit. (3) Memória: carga real de 2017 em `carregar_ano` teve pico de RSS 717 MB (NFR-1: 1 GiB); anos maiores (2024: 603 mil linhas) ainda não medidos com o banco — medir na Phase 8 e reduzir `CHUNKSIZE` se preciso. (4) Suíte completa com `real` ~147 s; usar `-m "not real"` (~5 s) no ciclo Red/Green.
 
 ## Deviations
 
@@ -27,6 +32,8 @@
 - 2026-09-19 — `EtlError` ficou em `etl_prf/errors.py` (plan a citava sem dizer o módulo) e `listar_zips` foi acrescentada a `zipcsv.py` para o aviso de ZIP fora do padrão (FR-1) · class: local · action: continuado
 - 2026-09-19 — DDL de `etl_log` (listada em `schema.py` na tabela de módulos do plan) fica para a Phase 3, onde é primeiro usada · class: local · action: continuado; registrado no Handover
 - 2026-09-19 — `test_real_counts.py` também roda `transformar` sobre cada chunk real (o plan pedia só a contagem de linhas); 2026 pula se a contagem mudar desde o E-1 · class: local · action: continuado
+
+- 2026-09-19 — Colunas de `etl_log` nomeadas por este passo (`drive_content_length`, `drive_x_goog_hash`, `drive_last_modified`, `tamanho`, `sha256`, `linhas`, `fechado`, `mensagem`, `timestamp`) e `db.py` ganhou `impressao`, `ano_inalterado`, `registrar_pulado`, `registrar_erro` além das funções do plan; a linha `ok` é gravada na mesma transação da carga · class: local · action: continuado
 
 ## Execution Log
 
@@ -44,6 +51,14 @@
 - Red: quatro módulos de teste escritos antes do código; coleta falhou com `ModuleNotFoundError: etl_prf.errors` (e schema/transform/zipcsv ausentes).
 - Green: `errors.py`, `schema.py`, `transform.py`, `zipcsv.py`; os 47 testes `not real` passaram de primeira e os 10 reais confirmaram as contagens.
 - Desvios locais registrados acima. Cabeçalho de referência dos 37 campos lido do ZIP 2017 (igual ao E-1) e replicado em `tests/conftest.py`.
+
+### 2026-09-19 — Phase 3: recarga transacional, idempotência e `etl_log`
+
+- Gate conferido: plan #1 na rev 6, aprovação da rev 6, sem CR aberto; `phase: implementing` já gravada.
+- Red: `tests/test_db.py` escrito antes do código; coleta falhou com `ModuleNotFoundError: etl_prf.db`.
+- Green: `db.py` e `DDL_ETL_LOG` em `schema.py`; 12 testes novos passaram de primeira.
+- Carga real de 2017 em banco temporário: 342 497 linhas, `etl_log` com `ok` e `pulado` (tamanho 10 726 416, mesmo sha256), RSS 717 336 kB.
+- Desvios locais registrados acima.
 
 ## Verification
 
@@ -67,6 +82,14 @@
 - [x] Static analysis scoped to changed files — `python3 -m compileall -q etl_prf tests` — `0 errors (baseline: n/a)`
 - [x] Lint / formatting — não há ferramenta no projeto (plan, Deferred) — n/a
 - [x] Any artifact the change is expected to (re)produce — nenhum; contagens reais conferidas: 2017 342 497, 2018 316 638, 2019 324 192, 2020 384 640, 2021 436 523, 2022 507 204, 2023 571 052, 2024 603 215, 2025 584 010, 2026 353 107; pico de RSS do pytest real 858 892 kB (`/usr/bin/time -v`)
+
+### Pass — Phase 3 — 2026-09-19
+
+- [x] Red confirmed — `python3 -m pytest -q tests/test_db.py` — `1 error de coleta: ModuleNotFoundError etl_prf.db (12 testes ainda não coletados)`
+- [x] Full test suite — `python3 -m pytest -q -m "not real"` — `59 passed, 11 deselected, 0 failures` (`tests/test_db.py`: 12 passed); `-m real` não reexecutado (Phase 3 não toca transform/zipcsv; Phase 2 seguia 10 passed)
+- [x] Static analysis scoped to changed files — `python3 -m compileall -q etl_prf tests` — `0 errors (baseline: n/a)`
+- [x] Lint / formatting — não há ferramenta no projeto (plan, Deferred) — n/a
+- [x] Any artifact the change is expected to (re)produce — `sqlite3` em banco temporário após carga real de 2017 + `pulado`: `etl_log` = (2017, local, ok, 342497, 10726416, 2577824c, 0) e (2017, local, pulado, NULL, 10726416, 2577824c, 0); `COUNT(*) acidentes` = 342497; pico RSS 717 336 kB
 
 ## Wrap up
 

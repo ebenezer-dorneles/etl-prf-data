@@ -27,6 +27,21 @@ DDL_ACIDENTES = (
     + ",\n    ano INTEGER NOT NULL\n)"
 )
 
+DDL_ETL_LOG = """CREATE TABLE IF NOT EXISTS etl_log (
+    ano INTEGER NOT NULL,
+    origem TEXT NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('ok', 'pulado', 'erro')),
+    linhas INTEGER,
+    tamanho INTEGER,
+    sha256 TEXT,
+    drive_content_length INTEGER,
+    drive_x_goog_hash TEXT,
+    drive_last_modified TEXT,
+    fechado INTEGER NOT NULL DEFAULT 0,
+    mensagem TEXT,
+    timestamp TEXT NOT NULL
+)"""
+
 DDL_INDICES = [
     "CREATE INDEX IF NOT EXISTS idx_acidentes_ano ON acidentes (ano)",
     "CREATE INDEX IF NOT EXISTS idx_acidentes_id ON acidentes (id)",
@@ -36,6 +51,7 @@ DDL_INDICES = [
 
 def criar_tabelas(conn: sqlite3.Connection) -> None:
     conn.execute(DDL_ACIDENTES)
+    conn.execute(DDL_ETL_LOG)
     for ddl in DDL_INDICES:
         conn.execute(ddl)
     conn.commit()
