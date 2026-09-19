@@ -1,0 +1,4 @@
+status 200 bytes 7716046 is_zipfile True
+sha256 remoto 050b54998f16078c5548beb630c048eb7deb5fa8d63495e7cc1f85340739b7c0
+sha256 local  050b54998f16078c5548beb630c048eb7deb5fa8d63495e7cc1f85340739b7c0
+identicos: True

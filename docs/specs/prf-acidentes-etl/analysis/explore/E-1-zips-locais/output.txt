@@ -1,0 +1,70 @@
+== acidentes2017_todas_causas_tipos.zip files=['acidentes2017_todas_causas_tipos.csv'] csv_bytes=124909840 enc=cp1252
+   rows=342497 ids=89567 cols=37 same_header_as_first=True
+   null_markers={'NA': 15, 'N/A': 2} cols_with_nulls=17
+   dup_by_key_rows=0 dup_full_rows=0 km_comma/dot=(np.int64(190895), np.int64(0)) sample_dates=['2017-04-03', '2017-07-04', '2017-12-21']
+   uf=27 br_nonnumeric={'NA': 509} date_min=2017-01-01 date_max=2017-12-31 date_unparsed=0
+   nulls_by_col={'pesid': 31907, 'br': 509, 'km': 509, 'classificacao_acidente': 12, 'id_veiculo': 11490, 'tipo_veiculo': 11490, 'ano_fabricacao_veiculo': 11490, 'tipo_envolvido': 31907, 'estado_fisico': 31907, 'idade': 57577, 'sexo': 31907, 'ilesos': 31907, 'feridos_leves': 31907, 'feridos_graves': 31907, 'mortos': 31907, 'delegacia': 4, 'uop': 15}
+   lat_comma=341423 horario_sample='00:00:00' idade_nonnum=284920 ano_fab_nonnum=331007
+== acidentes2018_todas_causas_tipos.zip files=['acidentes2018_todas_causas_tipos.csv'] csv_bytes=117269111 enc=cp1252
+   rows=316638 ids=69333 cols=37 same_header_as_first=True
+   null_markers={'NA': 15, 'N/A': 2} cols_with_nulls=18
+   dup_by_key_rows=0 dup_full_rows=0 km_comma/dot=(np.int64(178181), np.int64(0)) sample_dates=['2018-02-07', '2018-09-04', '2018-12-21']
+   uf=27 br_nonnumeric={'NA': 515} date_min=2018-01-01 date_max=2018-12-31 date_unparsed=0
+   nulls_by_col={'pesid': 27786, 'br': 515, 'km': 515, 'tipo_acidente': 55, 'classificacao_acidente': 3, 'id_veiculo': 11895, 'tipo_veiculo': 11895, 'ano_fabricacao_veiculo': 11895, 'tipo_envolvido': 27786, 'estado_fisico': 27786, 'idade': 55248, 'sexo': 27786, 'ilesos': 27786, 'feridos_leves': 27786, 'feridos_graves': 27786, 'mortos': 27786, 'delegacia': 128, 'uop': 148}
+   lat_comma=316118 horario_sample='00:20:00' idade_nonnum=261390 ano_fab_nonnum=304743
+== acidentes2019_todas_causas_tipos.zip files=['acidentes2019_todas_causas_tipos.csv'] csv_bytes=125404559 enc=cp1252
+   rows=324192 ids=67558 cols=37 same_header_as_first=True
+   null_markers={'NA': 15, 'N/A': 3} cols_with_nulls=19
+   dup_by_key_rows=0 dup_full_rows=0 km_comma/dot=(np.int64(177904), np.int64(0)) sample_dates=['2019-02-19', '2019-07-16', '2019-05-31']
+   uf=27 br_nonnumeric={'NA': 362} date_min=2019-01-01 date_max=2019-12-31 date_unparsed=0
+   nulls_by_col={'pesid': 26789, 'br': 362, 'km': 362, 'tipo_acidente': 40, 'classificacao_acidente': 18, 'id_veiculo': 12371, 'tipo_veiculo': 12371, 'ano_fabricacao_veiculo': 12371, 'tipo_envolvido': 26789, 'estado_fisico': 26789, 'idade': 55797, 'sexo': 26789, 'ilesos': 26789, 'feridos_leves': 26789, 'feridos_graves': 26789, 'mortos': 26789, 'regional': 24, 'delegacia': 237, 'uop': 256}
+   lat_comma=324111 horario_sample='01:30:00' idade_nonnum=268395 ano_fab_nonnum=311821
+== acidentes2020_todas_causas_tipos.zip files=['acidentes2020_todas_causas_tipos.csv'] csv_bytes=149275638 enc=cp1252
+   rows=384640 ids=63586 cols=37 same_header_as_first=True
+   null_markers={'NA': 15, 'N/A': 2} cols_with_nulls=18
+   dup_by_key_rows=0 dup_full_rows=0 km_comma/dot=(np.int64(186294), np.int64(0)) sample_dates=['2020-01-17', '2020-08-27', '2020-07-05']
+   uf=27 br_nonnumeric={'NA': 1024} date_min=2020-01-01 date_max=2020-12-31 date_unparsed=0
+   nulls_by_col={'pesid': 36592, 'br': 1024, 'km': 1024, 'tipo_acidente': 1, 'classificacao_acidente': 4, 'id_veiculo': 14680, 'tipo_veiculo': 14680, 'ano_fabricacao_veiculo': 14680, 'tipo_envolvido': 36592, 'estado_fisico': 36592, 'idade': 71300, 'sexo': 36592, 'ilesos': 36592, 'feridos_leves': 36592, 'feridos_graves': 36592, 'mortos': 36592, 'delegacia': 127, 'uop': 288}
+   lat_comma=384466 horario_sample='01:00:00' idade_nonnum=313340 ano_fab_nonnum=369960
+== acidentes2021_todas_causas_tipos.zip files=['acidentes2021_todas_causas_tipos.csv'] csv_bytes=170735605 enc=cp1252
+   rows=436523 ids=64567 cols=37 same_header_as_first=True
+   null_markers={'NA': 15, 'N/A': 2} cols_with_nulls=17
+   dup_by_key_rows=0 dup_full_rows=0 km_comma/dot=(np.int64(202764), np.int64(0)) sample_dates=['2021-02-21', '2021-09-14', '2021-05-13']
+   uf=27 br_nonnumeric={'NA': 1165} date_min=2021-01-01 date_max=2021-12-31 date_unparsed=0
+   nulls_by_col={'pesid': 43004, 'br': 1165, 'km': 1165, 'classificacao_acidente': 70, 'id_veiculo': 16315, 'tipo_veiculo': 16315, 'ano_fabricacao_veiculo': 16315, 'tipo_envolvido': 43004, 'estado_fisico': 43004, 'idade': 81614, 'sexo': 43004, 'ilesos': 43004, 'feridos_leves': 43004, 'feridos_graves': 43004, 'mortos': 43004, 'delegacia': 146, 'uop': 298}
+   lat_comma=436323 horario_sample='00:02:00' idade_nonnum=354909 ano_fab_nonnum=420208
+== acidentes2022_todas_causas_tipos.zip files=['acidentes2022_todas_causas_tipos.csv'] csv_bytes=191786699 enc=cp1252
+   rows=507204 ids=64607 cols=37 same_header_as_first=True
+   null_markers={'NA': 18, 'N/A': 3} cols_with_nulls=18
+   dup_by_key_rows=0 dup_full_rows=0 km_comma/dot=(np.int64(206109), np.int64(0)) sample_dates=['2022-09-18', '2022-04-17', '2022-08-16']
+   uf=27 br_nonnumeric={'NA': 1887} date_min=2022-01-01 date_max=2022-12-31 date_unparsed=0
+   nulls_by_col={'pesid': 50664, 'br': 1887, 'km': 1887, 'classificacao_acidente': 3, 'id_veiculo': 19196, 'tipo_veiculo': 19196, 'ano_fabricacao_veiculo': 19196, 'tipo_envolvido': 50664, 'estado_fisico': 50664, 'idade': 98264, 'sexo': 50664, 'ilesos': 50664, 'feridos_leves': 50664, 'feridos_graves': 50664, 'mortos': 50664, 'regional': 192, 'delegacia': 333, 'uop': 572}
+   lat_comma=506915 horario_sample='00:10:00' idade_nonnum=408940 ano_fab_nonnum=488008
+== acidentes2023_todas_causas_tipos.zip files=['acidentes2023_todas_causas_tipos.csv'] csv_bytes=216058400 enc=cp1252
+   rows=571052 ids=67767 cols=37 same_header_as_first=True
+   null_markers={'NA': 18, 'N/A': 3} cols_with_nulls=18
+   dup_by_key_rows=0 dup_full_rows=0 km_comma/dot=(np.int64(228710), np.int64(0)) sample_dates=['2023-05-06', '2023-04-30', '2023-09-14']
+   uf=27 br_nonnumeric={'NA': 1836} date_min=2023-01-01 date_max=2023-12-31 date_unparsed=0
+   nulls_by_col={'pesid': 55887, 'br': 1836, 'km': 1836, 'classificacao_acidente': 3, 'id_veiculo': 20772, 'tipo_veiculo': 20772, 'ano_fabricacao_veiculo': 20772, 'tipo_envolvido': 55887, 'estado_fisico': 55887, 'idade': 105448, 'sexo': 55887, 'ilesos': 55887, 'feridos_leves': 55887, 'feridos_graves': 55887, 'mortos': 55887, 'regional': 150, 'delegacia': 557, 'uop': 656}
+   lat_comma=570931 horario_sample='00:15:00' idade_nonnum=465604 ano_fab_nonnum=550280
+== acidentes2024_todas_causas_tipos.zip files=['acidentes2024_todas_causas_tipos.csv'] csv_bytes=233085036 enc=cp1252
+   rows=603215 ids=73156 cols=37 same_header_as_first=True
+   null_markers={'NA': 15, 'N/A': 3} cols_with_nulls=18
+   dup_by_key_rows=0 dup_full_rows=0 km_comma/dot=(np.int64(242891), np.int64(0)) sample_dates=['2024-05-26', '2024-11-29', '2024-12-28']
+   uf=27 br_nonnumeric={'NA': 1348} date_min=2024-01-01 date_max=2024-12-31 date_unparsed=0
+   nulls_by_col={'pesid': 57641, 'br': 1348, 'km': 1348, 'classificacao_acidente': 3, 'id_veiculo': 19572, 'tipo_veiculo': 19572, 'ano_fabricacao_veiculo': 19572, 'tipo_envolvido': 57641, 'estado_fisico': 57641, 'idade': 109408, 'sexo': 57641, 'ilesos': 57641, 'feridos_leves': 57641, 'feridos_graves': 57641, 'mortos': 57641, 'regional': 27, 'delegacia': 183, 'uop': 1663}
+   lat_comma=0 horario_sample='00:05:00' idade_nonnum=493807 ano_fab_nonnum=583643
+== acidentes2025_todas_causas_tipos.zip files=['acidentes2025_todas_causas_tipos.csv'] csv_bytes=223019483 enc=cp1252
+   rows=584010 ids=72529 cols=37 same_header_as_first=True
+   null_markers={'NA': 15, 'N/A': 3} cols_with_nulls=18
+   dup_by_key_rows=0 dup_full_rows=0 km_comma/dot=(np.int64(236024), np.int64(0)) sample_dates=['2025-01-31', '2025-07-07', '2025-06-07']
+   uf=27 br_nonnumeric={'NA': 1444} date_min=2025-01-01 date_max=2025-12-31 date_unparsed=0
+   nulls_by_col={'pesid': 56801, 'br': 1444, 'km': 1444, 'classificacao_acidente': 7, 'id_veiculo': 18617, 'tipo_veiculo': 18617, 'ano_fabricacao_veiculo': 18617, 'tipo_envolvido': 56801, 'estado_fisico': 56801, 'idade': 105613, 'sexo': 56801, 'ilesos': 56801, 'feridos_leves': 56801, 'feridos_graves': 56801, 'mortos': 56801, 'regional': 16, 'delegacia': 190, 'uop': 443}
+   lat_comma=583761 horario_sample='00:30:00' idade_nonnum=478397 ano_fab_nonnum=565393
+== acidentes2026_todas_causas_tipos.zip files=['acidentes2026_todas_causas_tipos.csv'] csv_bytes=134695138 enc=cp1252
+   rows=353107 ids=42322 cols=37 same_header_as_first=True
+   null_markers={'NA': 18, 'N/A': 2} cols_with_nulls=18
+   dup_by_key_rows=0 dup_full_rows=0 km_comma/dot=(np.int64(140488), np.int64(0)) sample_dates=['2026-02-26', '2026-02-04', '2026-02-14']
+   uf=27 br_nonnumeric={'NA': 696} date_min=2026-01-01 date_max=2026-07-31 date_unparsed=0
+   nulls_by_col={'pesid': 34746, 'br': 696, 'km': 696, 'classificacao_acidente': 120, 'id_veiculo': 10544, 'tipo_veiculo': 10544, 'ano_fabricacao_veiculo': 10544, 'tipo_envolvido': 34746, 'estado_fisico': 34746, 'idade': 61850, 'sexo': 34746, 'ilesos': 34746, 'feridos_leves': 34746, 'feridos_graves': 34746, 'mortos': 34746, 'regional': 2, 'delegacia': 88, 'uop': 239}
+   lat_comma=352850 horario_sample='00:05:00' idade_nonnum=291257 ano_fab_nonnum=342563

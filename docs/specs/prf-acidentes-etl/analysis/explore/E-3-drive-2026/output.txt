@@ -1,0 +1,10 @@
+redirects: [(303, 'https://drive.usercontent.google.com/download?id=1EsGox0UnBWSaM6mrkNSUlYUOecubLC')]
+final: 200 https://drive.usercontent.google.com/download
+content-type: application/octet-stream
+content-length: 7716046
+content-disposition: attachment; filename="acidentes2026_todas_causas_tipos.zip"
+last-modified: Tue, 01 Sep 2026 01:58:04 GMT
+etag: None
+x-goog-hash: crc32c=zauaUg==
+first_bytes: b'PK\x03\x04' is_zip: True
+local_zip_bytes: 7716046 mtime: 1789827336.260176
