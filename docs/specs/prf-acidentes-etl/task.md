@@ -27,19 +27,24 @@
 - [x] Phase 5 — Green: `etl_prf/drive.py` (`download_validated`, `Validacao`) + `URL_DOWNLOAD` em `config.py`
 - [x] Phase 5 — Refactor: `Validacao` (dataclass) carrega cabeçalhos e avisos; `_gravar` e `_validar` separados
 - [x] Phase 5 — Done when: testes verdes; nenhum `.part` sobra após falha (testado em cada falha)
-- [ ] Phase 5 — AC-11/AC-12 (contagem de GETs) ficam em `test_pipeline.py` na Phase 7, conforme a Coverage do plan
+- [x] Phase 5 — AC-11/AC-12 (contagem de GETs) cobertos em `test_pipeline.py` na Phase 7, conforme a Coverage do plan
 
 - [x] Phase 6 — Red: `tests/test_latest.py` (AC-13, AC-14, AC-15, AC-30, AC-31, AC-32, AC-33, AC-37, AC-39, AC-41, NFR-3; `probe_headers`; tabela de `decidir_acao`)
 - [x] Phase 6 — Green: `drive.probe_headers`, `pipeline.decidir_acao`/`atualizar_ano`; `db.carregar_ano(fechar, avisos)` e `db.registrar_pulado(drive, mensagem)`
 - [x] Phase 6 — Refactor: `decidir_acao` pura; `_cabecalhos` compartilhado entre sonda e download
 - [x] Phase 6 — Done when: testes verdes; sonda = 1 GET (NFR-3, contado em AC-13)
 
+- [x] Phase 7 — Red: `tests/test_pipeline.py` (AC-11, AC-12, AC-16, AC-19, AC-39, fechamento do ano anterior, `--force` só no mais recente, exceção inesperada isolada, aviso de ZIP fora do padrão, resumo, valor sentinela) e `tests/test_cli.py` (AC-34, AC-35, AC-16 com código de saída, `--force`, `--help`)
+- [x] Phase 7 — Green: `pipeline.run`/`Execucao`/`formatar_resumo`, `Resultado.origem`/`linhas`, `db.contar_linhas`/`ultima_mensagem`, `etl_prf/cli.py` e `etl_prf/__main__.py`
+- [x] Phase 7 — Refactor: resumo em `formatar_resumo`; `_ano_fechado`, `_processar` e `_pendente_de_fechamento` separados
+- [x] Phase 7 — Done when: `not real` verde; `python3 -m etl_prf --help` funciona. A execução real com resumo fica para a Phase 8 (carga completa, `data/` vazio)
+
 ## State Handover
 
-- Done: Phase 6 completa e verificada (106 testes `not real` verdes; `test_latest.py` 19 passed). Fases 1–5 seguem verdes.
-- Next: Phase 7 (isolamento de falhas, CLI e resumo) — rodar `/ssd-workflow:ssd-task` de novo; decompor só a Phase 7. Inclui o item aberto da Phase 5 (AC-11/AC-12, contagem de GETs em `test_pipeline.py`).
+- Done: Phase 7 completa e verificada (124 testes `not real` verdes; `test_pipeline.py` 13 + `test_cli.py` 5). Fases 1–6 seguem verdes. `python -m etl_prf [--force]` existe; falta só rodar de verdade.
+- Next: Phase 8 (carga completa real e medições) — rodar `/ssd-workflow:ssd-task` de novo; não é test-first: comando de memória do plan com `data/` vazio (a primeira execução real cria `data/prf.sqlite` e faz 2 GETs: página e sonda do 2026), `sqlite3` para contagens por ano e para as 43 linhas de `id` científico, 2ª execução pulando os 10 anos (AC-7), tempo anotado; AC-12 também aqui.
 - Blockers / open decisions: nenhum; sem CR aberto.
-- Watch out: (1) `pipeline.atualizar_ano(conn, session, ano, id_, pasta, *, force=False, fechar=False) -> Resultado(ano, status, mensagem, avisos)`; status `ok`/`pulado`/`erro`/`fechado` (este último = já fechado, sem GET nem gravação; a Phase 7 deve tratar ano fechado pelo caminho geral com `registrar_pulado`, AC-39). Só captura `EtlError` (grava linha `erro`); outras exceções (OSError, sqlite) sobem — a Phase 7 isola. (2) Chamar `atualizar_ano` só para o ano mais recente e, com `fechar=True`, para o ano anterior quando um mais novo aparece na página; anos fechados não passam por aqui. (3) `--force` ainda faz a sonda (2 GETs); a Phase 7 propaga `force` só ao ano mais recente. (4) Avisos (`crc32c ausente…`) vão em `Resultado.avisos` e em `etl_log.mensagem`; o resumo os lê de `Resultado`. (5) Os 4 fakes de sessão (`test_drive.Resp/FakeSession`, `test_crawler`, `test_latest.Sessao`) coexistem; `test_latest` importa `Resp`, `goog`, `resp_ok` de `test_drive` — consolidar em `conftest.py` na Phase 7 se o pipeline completo precisar. (6) Herdados: RSS 717 MB em 2017 (medir 2024 na Phase 8), usar `-m "not real"` no ciclo.
+- Watch out: (1) `run(conn, session, pasta, *, force, readme)` devolve `Execucao(resultados, avisos)`; `readme` (padrão `IDS_README`) existe só para os testes desligarem o preenchimento de D-18. (2) O ano anterior ao mais recente só é sondado (`fechar=True`) se sua referência tem cabeçalhos do Drive e não é fechada; anos já baixados por falta de ZIP também levam uma sondagem única. (3) Ano fechado nunca consulta o Drive: ZIP ausente → baixa e carrega; presente e inalterado (tamanho + sha256) → `pulado`; alterado → recarrega. (4) Exceção fora de `EtlError` (OSError, sqlite3) vira `erro` do ano com `TypeName: mensagem`; mensagens de exceção podem, em tese, citar detalhes do SQLite (sem valores de linha nos testes). (5) `Resultado.mensagem` do resumo vem da última linha de `etl_log` do ano (avisos e contagens de falhas de conversão). (6) Herdado: RSS 717 MB em 2017 e 859 MB no pytest real; medir com o comando do plan na Phase 8 (limite 1024 MiB). (7) Uso `-m "not real"` no ciclo; os 4 fakes de sessão continuam separados (`test_pipeline` importa de `test_latest`, `test_drive`, `test_crawler`).
 
 ## Deviations
 
@@ -62,6 +67,10 @@
 - 2026-09-19 — `probe_headers` mora em `drive.py` e a decisão/orquestração do ano mais recente em `pipeline.py` (`decidir_acao`, `atualizar_ano`, `Resultado`), como a tabela de módulos do plan; `db.carregar_ano` ganhou `fechar` e `avisos`, `db.registrar_pulado` ganhou `drive` e `mensagem` (AC-32, AC-33, AC-41) · class: local · action: continuado
 - 2026-09-19 — Referência sem cabeçalhos do Drive (`drive_content_length` nulo) compara o `content-length` com o tamanho registrado, e o crc32c só é comparado quando os dois lados o têm; a spec não descreve esses casos · class: local · action: continuado
 - 2026-09-19 — `atualizar_ano` sempre sonda, mesmo com `--force` (a spec não diz se `--force` dispensa a sonda); os cabeçalhos ficam registrados e a contagem de GETs é 2 · class: local · action: continuado; Handover avisa a Phase 7
+
+- 2026-09-19 — `run` e `main` ganharam o parâmetro `readme` (padrão `IDS_README`) só para os testes usarem páginas com poucos anos sem o preenchimento de D-18; `Resultado` ganhou `origem` e `linhas` e `Execucao` agrega resultados e avisos · class: local · action: continuado
+- 2026-09-19 — O fechamento do ano anterior só roda se a referência dele tem cabeçalhos do Drive (foi o mais recente) e não está fechado; a spec não diz como distinguir esse caso de um ano fechado carregado do ZIP local, e sem a regra todo ano anterior seria sondado a cada execução (NFR-3). Efeito colateral: um ano fechado baixado por falta de ZIP recebe uma sondagem única · class: local · action: continuado; Handover avisa
+- 2026-09-19 — Exceções que não são `EtlError` (OSError, sqlite3, ZIP corrompido) também viram `erro` do ano, para o isolamento de FR-8 valer a qualquer falha; a spec lista só erros de rede, cota, HTML, ZIP inválido, CSVs e cabeçalho · class: local · action: continuado
 
 ## Execution Log
 
@@ -109,6 +118,13 @@
 - Red: `tests/test_latest.py` escrito antes do código; coleta falhou com `ImportError: cannot import name 'probe_headers'`.
 - Green: `probe_headers`, `pipeline.py`, extensões em `db.py`; 19 testes passaram; três testes (AC-14, AC-31, AC-41) reescritos depois para ficarem legíveis, sem mudar o que verificam.
 - Desvios locais registrados acima.
+
+### 2026-09-19 — Phase 7: isolamento de falhas, CLI e resumo
+
+- Gate conferido: plan #1 na rev 6, aprovação da rev 6, sem CR aberto; `phase: implementing` já gravada.
+- Red: `tests/test_pipeline.py` e `tests/test_cli.py` escritos antes do código; coleta falhou com `ModuleNotFoundError: etl_prf.cli` (e `formatar_resumo`/`run` ausentes).
+- Green: `pipeline.run`, `formatar_resumo`, `cli.py`, `__main__.py`, `db.contar_linhas`/`ultima_mensagem`. Dois ajustes durante o Green: o crawler preenche anos ausentes com o README (D-18), então `run`/`main` ganharam `readme`; a mensagem do resumo passou a vir da última linha de `etl_log`.
+- Desvios locais registrados acima. AC-11/AC-12 (item aberto da Phase 5) fechados.
 
 ## Verification
 
@@ -164,6 +180,14 @@
 - [x] Static analysis scoped to changed files — `python3 -m compileall -q etl_prf tests` — `0 errors (baseline: n/a)`
 - [x] Lint / formatting — não há ferramenta no projeto (plan, Deferred) — n/a
 - [x] Any artifact the change is expected to (re)produce — nenhum; contagem de requisições (NFR-3) conferida em `test_ac13…` (1 GET) e `ls *.part`: nenhum arquivo sobrando
+
+### Pass — Phase 7 — 2026-09-19
+
+- [x] Red confirmed — `python3 -m pytest -q tests/test_pipeline.py tests/test_cli.py` — `2 errors de coleta: ModuleNotFoundError etl_prf.cli / ImportError formatar_resumo (18 testes ainda não coletados)`
+- [x] Full test suite — `python3 -m pytest -q -m "not real"` — `124 passed, 11 deselected, 0 failures` (`test_pipeline.py` + `test_cli.py`: 18 passed); `-m real` não reexecutado (Phase 7 não toca transform/zipcsv; `db.py` só ganhou duas funções de leitura)
+- [x] Static analysis scoped to changed files — `python3 -m compileall -q etl_prf tests` — `0 errors (baseline: n/a)`
+- [x] Lint / formatting — não há ferramenta no projeto (plan, Deferred) — n/a
+- [x] Any artifact the change is expected to (re)produce — `python3 -m etl_prf --help` imprime o uso com `--force`; o resumo real fica para a Phase 8; `ls *.part`: nenhum arquivo sobrando
 
 ## Wrap up
 

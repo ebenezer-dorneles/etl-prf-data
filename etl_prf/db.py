@@ -138,3 +138,13 @@ def registrar_pulado(
 
 def registrar_erro(conn: sqlite3.Connection, ano: int, origem: str, mensagem: str, drive: dict | None = None) -> None:
     _gravar_log(conn, ano, origem, "erro", None, None, None, _drive(drive), False, mensagem)
+
+
+def contar_linhas(conn: sqlite3.Connection, ano: int) -> int:
+    return conn.execute("SELECT COUNT(*) FROM acidentes WHERE ano = ?", (ano,)).fetchone()[0]
+
+
+def ultima_mensagem(conn: sqlite3.Connection, ano: int) -> str | None:
+    """Mensagem da linha mais recente do ano (avisos e contagens de falhas; nunca valores, AC-6)."""
+    row = conn.execute("SELECT mensagem FROM etl_log WHERE ano = ? ORDER BY rowid DESC LIMIT 1", (ano,)).fetchone()
+    return row[0] if row else None
