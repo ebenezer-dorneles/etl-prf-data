@@ -1,7 +1,7 @@
 ---
-issues: []
+issues: ["#1"]
 status: in-progress
-phase: approved
+phase: implementing
 spec-revision: 6
 tier: M
 ---
